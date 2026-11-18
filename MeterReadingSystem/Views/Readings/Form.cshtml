@@ -1,0 +1,141 @@
+@model ReadingFormViewModel
+@{
+    ViewData["Title"] = Model.IsEdit ? "แก้ไขค่าอ่านมิเตอร์" : "บันทึกค่าอ่านมิเตอร์";
+    ViewData["Subtitle"] = Model.IsEdit
+        ? "แก้ไขค่าอ่าน ระบบจะตรวจสอบกับรายการก่อนหน้า/ถัดไปและคำนวณปริมาณการใช้ใหม่ให้อัตโนมัติ"
+        : "เลือกมิเตอร์ กรอกค่าอ่านสะสม ระบบจะคำนวณปริมาณการใช้ให้ทันที";
+    var returnUrl = ViewBag.ReturnUrl as string;
+}
+
+<form method="post" novalidate id="readingForm">
+    @if (returnUrl is not null) { <input type="hidden" name="returnUrl" value="@returnUrl" /> }
+    <div class="row g-3">
+        <div class="col-lg-7">
+            <div class="card-x h-100">
+                <div class="card-x-header">
+                    <h2><i class="bi bi-pencil-square me-1 text-primary"></i> ข้อมูลค่าอ่าน</h2>
+                    <span class="hint"><span class="text-danger">*</span> จำเป็นต้องกรอก</span>
+                </div>
+                <div class="card-x-body">
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+                    <div class="mb-3">
+                        <label asp-for="MeterId" class="form-label">เลือกมิเตอร์ <span class="req">*</span></label>
+                        @if (Model.IsEdit)
+                        {
+                            <input type="hidden" asp-for="MeterId" />
+                            <input class="form-control" value="@Model.Meter!.MeterCode — @Model.Meter.Location" disabled />
+                            <div class="form-text"><i class="bi bi-lock"></i> ไม่สามารถเปลี่ยนมิเตอร์ของรายการที่บันทึกแล้ว</div>
+                        }
+                        else
+                        {
+                            <select asp-for="MeterId" class="form-select">
+                                <option value="">-- เลือกมิเตอร์ --</option>
+                                @foreach (var g in Model.Meters.GroupBy(m => m.MeterType))
+                                {
+                                    <optgroup label="@MeterLabels.TypeName(g.Key)">
+                                        @foreach (var m in g)
+                                        {
+                                            <option value="@m.Id" selected="@(Model.MeterId == m.Id)">@m.MeterCode — @m.Location</option>
+                                        }
+                                    </optgroup>
+                                }
+                            </select>
+                            @if (Model.Meters.Count == 0)
+                            {
+                                <div class="form-text text-danger">ยังไม่มีมิเตอร์ที่ใช้งานได้ <a asp-controller="Meters" asp-action="Create">เพิ่มมิเตอร์</a></div>
+                            }
+                        }
+                        <span asp-validation-for="MeterId"></span>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label asp-for="ReadingDate" class="form-label">วันที่อ่านมิเตอร์ <span class="req">*</span></label>
+                            <input asp-for="ReadingDate" type="date" class="form-control" max="@Fmt.Iso(DateTime.Today)" />
+                            <span asp-validation-for="ReadingDate"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="CumulativeReading" class="form-label">ค่าอ่านสะสม <span class="req">*</span></label>
+                            <div class="input-group">
+                                <input asp-for="CumulativeReading" type="number" step="any" min="0" inputmode="decimal" class="form-control" placeholder="0" />
+                                <span class="input-group-text unit-label">หน่วย</span>
+                            </div>
+                            <span asp-validation-for="CumulativeReading"></span>
+                        </div>
+                    </div>
+
+                    <div class="mt-3">
+                        <label asp-for="Notes" class="form-label">หมายเหตุ</label>
+                        <textarea asp-for="Notes" class="form-control" rows="3" placeholder="เช่น เปลี่ยนแบตเตอรี่, ผู้อ่าน: สมชาย"></textarea>
+                        <span asp-validation-for="Notes"></span>
+                    </div>
+                </div>
+                <div class="card-x-header border-top border-bottom-0 justify-content-end">
+                    @if (Model.IsEdit)
+                    {
+                        <a class="btn btn-light px-4" href="@(returnUrl ?? Url.Action("Index"))">ยกเลิก</a>
+                        <button class="btn btn-primary px-4" type="submit"><i class="bi bi-check-lg"></i> บันทึกการแก้ไข</button>
+                    }
+                    else
+                    {
+                        <a class="btn btn-light px-4" asp-action="Index">ยกเลิก</a>
+                        <button class="btn btn-soft px-3" type="submit" name="saveAndNew" value="1"><i class="bi bi-plus-lg"></i> บันทึกและเพิ่มต่อ</button>
+                        <button class="btn btn-primary px-4" type="submit"><i class="bi bi-check-lg"></i> บันทึก</button>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card-x mb-3">
+                <div class="card-x-header"><h2><i class="bi bi-info-circle me-1 text-primary"></i> ข้อมูลมิเตอร์</h2></div>
+                <div class="card-x-body">
+                    <div id="meterEmpty" class="text-secondary text-center py-3">
+                        <i class="bi bi-hand-index fs-3 d-block mb-1"></i>เลือกมิเตอร์เพื่อแสดงข้อมูล
+                    </div>
+                    <dl class="meter-panel row mb-0 d-none" id="meterPanel">
+                        <dt class="col-5">รหัสมิเตอร์</dt><dd class="col-7" id="mCode">-</dd>
+                        <dt class="col-5">ประเภทมิเตอร์</dt><dd class="col-7" id="mType">-</dd>
+                        <dt class="col-5">สถานที่ติดตั้ง</dt><dd class="col-7" id="mLocation">-</dd>
+                        <dt class="col-5">สถานะ</dt><dd class="col-7 mb-0" id="mStatus">-</dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="card-x">
+                <div class="card-x-header"><h2><i class="bi bi-calculator me-1 text-primary"></i> คำนวณปริมาณการใช้</h2></div>
+                <div class="card-x-body">
+                    <div class="prev-next mb-3">
+                        <div>
+                            <div class="k"><i class="bi bi-skip-backward"></i> ค่าอ่านครั้งก่อน</div>
+                            <div class="v" id="prevValue">-</div>
+                            <div class="small text-secondary" id="prevDate"></div>
+                        </div>
+                        <div>
+                            <div class="k"><i class="bi bi-skip-forward"></i> ค่าอ่านครั้งถัดไป</div>
+                            <div class="v" id="nextValue">-</div>
+                            <div class="small text-secondary" id="nextDate"></div>
+                        </div>
+                    </div>
+                    <div class="calc-box" id="calcBox">
+                        <div class="label">ปริมาณการใช้ (ค่าอ่านปัจจุบัน − ค่าอ่านครั้งก่อน)</div>
+                        <div class="value" id="consumption">-</div>
+                        <div class="small" id="calcNote">กรอกค่าอ่านสะสมเพื่อคำนวณ</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        window.readingFormConfig = {
+            infoUrl: '@Url.Action("MeterInfo")',
+            excludeId: @(Model.Id?.ToString() ?? "null")
+        };
+    </script>
+    <script src="~/js/reading-form.js" asp-append-version="true"></script>
+}

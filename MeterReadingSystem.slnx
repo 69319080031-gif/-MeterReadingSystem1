@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="MeterReadingSystem.Tests/MeterReadingSystem.Tests.csproj" />
+  <Project Path="MeterReadingSystem/MeterReadingSystem.csproj" />
+</Solution>

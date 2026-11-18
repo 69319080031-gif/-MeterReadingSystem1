@@ -1,0 +1,106 @@
+@model MeterIndexViewModel
+@{
+    ViewData["Title"] = "จัดการมิเตอร์";
+    ViewData["Subtitle"] = "เพิ่ม แก้ไข ลบ และค้นหาข้อมูลมิเตอร์น้ำและไฟฟ้า";
+}
+
+<div class="card-x mb-3">
+    <div class="card-x-body">
+        <form method="get" class="filter-bar">
+            <div>
+                <label class="form-label" for="search">ค้นหา</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                    <input class="form-control" id="search" name="search" value="@Model.Search" placeholder="รหัสมิเตอร์ หรือ สถานที่" />
+                </div>
+            </div>
+            <div>
+                <label class="form-label" for="type">ประเภทมิเตอร์</label>
+                <select class="form-select" id="type" name="type" data-autosubmit>
+                    <option value="">ทั้งหมด</option>
+                    <option value="Water" selected="@(Model.Type == MeterType.Water)">มิเตอร์น้ำ</option>
+                    <option value="Electricity" selected="@(Model.Type == MeterType.Electricity)">มิเตอร์ไฟฟ้า</option>
+                </select>
+            </div>
+            <div>
+                <label class="form-label" for="status">สถานะ</label>
+                <select class="form-select" id="status" name="status" data-autosubmit>
+                    <option value="">ทั้งหมด</option>
+                    @foreach (var s in Enum.GetValues<MeterStatus>())
+                    {
+                        <option value="@s" selected="@(Model.Status == s)">@MeterLabels.StatusName(s)</option>
+                    }
+                </select>
+            </div>
+            <div class="actions">
+                <button class="btn btn-primary flex-fill" type="submit"><i class="bi bi-funnel"></i> กรอง</button>
+                <a class="btn btn-light" asp-action="Index" title="ล้างตัวกรอง"><i class="bi bi-x-lg"></i></a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card-x">
+    <div class="card-x-header">
+        <h2>รายการมิเตอร์ <span class="text-secondary fw-normal">(@Model.Items.Count รายการ)</span></h2>
+        <a class="btn btn-primary" asp-action="Create"><i class="bi bi-plus-lg"></i> เพิ่มมิเตอร์</a>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-x">
+            <thead>
+            <tr>
+                <th>รหัสมิเตอร์</th>
+                <th>ประเภท</th>
+                <th>สถานที่ติดตั้ง</th>
+                <th>วันที่ติดตั้ง</th>
+                <th>สถานะ</th>
+                <th class="num">ค่าอ่านล่าสุด</th>
+                <th class="num">จำนวนครั้ง</th>
+                <th class="text-end">จัดการ</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var item in Model.Items)
+            {
+                var m = item.Meter;
+                <tr>
+                    <td>
+                        <span class="code">@m.MeterCode</span>
+                        @if (!string.IsNullOrEmpty(m.Notes)) { <div class="small text-secondary text-truncate" style="max-width:220px" title="@m.Notes">@m.Notes</div> }
+                    </td>
+                    <td>@Ui.TypeBadge(m.MeterType)</td>
+                    <td>@m.Location</td>
+                    <td>@Fmt.Date(m.InstallationDate)</td>
+                    <td>@Ui.StatusBadge(m.Status)</td>
+                    <td class="num">
+                        @if (item.LatestReading is { } lr)
+                        {
+                            <strong>@Fmt.Num(lr.CumulativeReading)</strong> <small class="text-secondary">@m.Unit</small>
+                            <div class="small text-secondary">@Fmt.Date(lr.ReadingDate)</div>
+                        }
+                        else { <span class="text-secondary">-</span> }
+                    </td>
+                    <td class="num">@item.ReadingCount</td>
+                    <td class="text-end text-nowrap">
+                        @if (m.Status != MeterStatus.Inactive)
+                        {
+                            <a class="btn btn-soft btn-action" asp-controller="Readings" asp-action="Create" asp-route-meterId="@m.Id" title="บันทึกค่าอ่าน"><i class="bi bi-pencil-square"></i></a>
+                        }
+                        <a class="btn btn-light btn-action" asp-controller="Readings" asp-action="Index" asp-route-meterId="@m.Id" title="ดูประวัติ"><i class="bi bi-clock-history"></i></a>
+                        <a class="btn btn-light btn-action" asp-action="Edit" asp-route-id="@m.Id" title="แก้ไข"><i class="bi bi-pencil"></i></a>
+                        <button type="button" class="btn btn-light btn-action text-danger" title="ลบ"
+                                data-delete-url="@Url.Action("Delete", new { id = m.Id })"
+                                data-delete-message="@($"ลบมิเตอร์ {m.MeterCode} ({m.Location})" + (item.ReadingCount > 0 ? $" พร้อมค่าอ่านทั้งหมด {item.ReadingCount} รายการ?" : "?"))">
+                            <i class="bi bi-trash3"></i>
+                        </button>
+                    </td>
+                </tr>
+            }
+            @if (Model.Items.Count == 0)
+            {
+                <tr><td colspan="8" class="empty"><i class="bi bi-search"></i>ไม่พบมิเตอร์ตามเงื่อนไขที่ค้นหา</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

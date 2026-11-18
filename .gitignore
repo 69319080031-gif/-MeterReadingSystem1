@@ -1,0 +1,6 @@
+bin/
+obj/
+.vs/
+*.user
+MeterReadingSystem/App_Data/*.db-shm
+MeterReadingSystem/App_Data/*.db-wal

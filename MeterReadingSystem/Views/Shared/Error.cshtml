@@ -1,0 +1,14 @@
+﻿@model ErrorViewModel
+@{
+    ViewData["Title"] = "เกิดข้อผิดพลาด";
+}
+<div class="card-x text-center p-5 mx-auto" style="max-width:560px">
+    <div class="danger-icon"><i class="bi bi-exclamation-octagon"></i></div>
+    <h2 class="h4 mt-3">ขออภัย ระบบเกิดข้อผิดพลาด</h2>
+    <p class="text-secondary">ไม่สามารถดำเนินการตามคำขอได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง หากยังพบปัญหาโปรดแจ้งผู้ดูแลระบบ</p>
+    @if (Model?.ShowRequestId == true)
+    {
+        <p class="small text-secondary">รหัสอ้างอิง: <code>@Model.RequestId</code></p>
+    }
+    <a class="btn btn-primary" asp-controller="Dashboard" asp-action="Index"><i class="bi bi-house"></i> กลับหน้าแดชบอร์ด</a>
+</div>

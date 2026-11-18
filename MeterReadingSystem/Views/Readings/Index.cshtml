@@ -1,0 +1,153 @@
+@model ReadingHistoryViewModel
+@{
+    ViewData["Title"] = "ประวัติการอ่านมิเตอร์";
+    ViewData["Subtitle"] = "ค้นหา กรอง แก้ไข และลบรายการค่าอ่านย้อนหลัง";
+    var f = Model.Filter;
+    var r = Model.Result;
+    var current = Context.Request.Path + Context.Request.QueryString;
+
+    Dictionary<string, string> Route(int? page = null, string? sort = null) => new Dictionary<string, string?>
+    {
+        ["search"] = f.Search,
+        ["type"] = f.Type?.ToString(),
+        ["meterId"] = f.MeterId?.ToString(),
+        ["from"] = f.From.HasValue ? Fmt.Iso(f.From.Value) : null,
+        ["to"] = f.To.HasValue ? Fmt.Iso(f.To.Value) : null,
+        ["sort"] = sort ?? f.Sort,
+        ["page"] = (page ?? r.Page).ToString()
+    }.Where(kv => !string.IsNullOrEmpty(kv.Value)).ToDictionary(kv => kv.Key, kv => kv.Value!);
+    var nextSort = f.Sort == "asc" ? "desc" : "asc";
+}
+
+<div class="card-x mb-3">
+    <div class="card-x-body">
+        <form method="get" class="filter-bar">
+            <div>
+                <label class="form-label" for="search">ค้นหารหัสมิเตอร์</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                    <input class="form-control" id="search" name="search" value="@f.Search" placeholder="รหัส หรือ สถานที่" />
+                </div>
+            </div>
+            <div>
+                <label class="form-label" for="type">ประเภทมิเตอร์</label>
+                <select class="form-select" id="type" name="type">
+                    <option value="">ทั้งหมด</option>
+                    <option value="Water" selected="@(f.Type == MeterType.Water)">มิเตอร์น้ำ</option>
+                    <option value="Electricity" selected="@(f.Type == MeterType.Electricity)">มิเตอร์ไฟฟ้า</option>
+                </select>
+            </div>
+            <div>
+                <label class="form-label" for="meterId">มิเตอร์</label>
+                <select class="form-select" id="meterId" name="meterId">
+                    <option value="">ทุกมิเตอร์</option>
+                    @foreach (var m in Model.Meters)
+                    {
+                        <option value="@m.Id" selected="@(f.MeterId == m.Id)">@m.MeterCode — @m.Location</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label class="form-label" for="from">ตั้งแต่วันที่</label>
+                <input class="form-control" type="date" id="from" name="from" value="@(f.From.HasValue ? Fmt.Iso(f.From.Value) : "")" />
+            </div>
+            <div>
+                <label class="form-label" for="to">ถึงวันที่</label>
+                <input class="form-control" type="date" id="to" name="to" value="@(f.To.HasValue ? Fmt.Iso(f.To.Value) : "")" />
+            </div>
+            <div>
+                <label class="form-label" for="sort">เรียงตามวันที่อ่าน</label>
+                <select class="form-select" id="sort" name="sort">
+                    <option value="desc" selected="@(f.Sort != "asc")">ใหม่ → เก่า</option>
+                    <option value="asc" selected="@(f.Sort == "asc")">เก่า → ใหม่</option>
+                </select>
+            </div>
+            <div class="actions">
+                <button class="btn btn-primary flex-fill" type="submit"><i class="bi bi-funnel"></i> ค้นหา</button>
+                <a class="btn btn-light" asp-action="Index" title="ล้างตัวกรอง"><i class="bi bi-x-lg"></i></a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card-x">
+    <div class="card-x-header">
+        <h2>รายการค่าอ่าน <span class="text-secondary fw-normal">(@r.TotalCount.ToString("N0") รายการ)</span></h2>
+        <div class="d-flex gap-2">
+            <a class="btn btn-light" asp-action="Export" asp-all-route-data="Route()"><i class="bi bi-filetype-csv"></i> ส่งออก CSV</a>
+            <a class="btn btn-primary" asp-action="Create"><i class="bi bi-plus-lg"></i> บันทึกค่าอ่าน</a>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-x">
+            <thead>
+            <tr>
+                <th>
+                    <a class="text-reset text-decoration-none" asp-action="Index" asp-all-route-data="Route(1, nextSort)" title="สลับการเรียง">
+                        วันที่อ่าน <i class="bi @(f.Sort == "asc" ? "bi-sort-up" : "bi-sort-down")"></i>
+                    </a>
+                </th>
+                <th>รหัสมิเตอร์</th>
+                <th>ประเภท</th>
+                <th>สถานที่ติดตั้ง</th>
+                <th class="num">ค่าอ่านสะสม</th>
+                <th class="num">ปริมาณการใช้</th>
+                <th>หมายเหตุ</th>
+                <th class="text-end">จัดการ</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var x in r.Items)
+            {
+                <tr>
+                    <td class="text-nowrap">@Fmt.Date(x.ReadingDate)</td>
+                    <td><span class="code">@x.Meter!.MeterCode</span></td>
+                    <td>@Ui.TypeBadge(x.Meter.MeterType)</td>
+                    <td>@x.Meter.Location</td>
+                    <td class="num">@Fmt.Num(x.CumulativeReading) <small class="text-secondary">@x.Meter.Unit</small></td>
+                    <td class="num">
+                        @if (x.Consumption.HasValue) { <strong>@Fmt.Num(x.Consumption)</strong> <small class="text-secondary">@x.Meter.Unit</small> }
+                        else { <span class="badge-soft badge-first">ครั้งแรก</span> }
+                    </td>
+                    <td class="small text-secondary"><span class="d-inline-block text-truncate" style="max-width:200px" title="@x.Notes">@x.Notes</span></td>
+                    <td class="text-end text-nowrap">
+                        <a class="btn btn-light btn-action" asp-action="Edit" asp-route-id="@x.Id" asp-route-returnUrl="@current" title="แก้ไข"><i class="bi bi-pencil"></i></a>
+                        <button type="button" class="btn btn-light btn-action text-danger" title="ลบ"
+                                data-delete-url="@Url.Action("Delete", new { id = x.Id })"
+                                data-delete-message="@($"ลบค่าอ่านมิเตอร์ {x.Meter.MeterCode} วันที่ {Fmt.Date(x.ReadingDate)} ({Fmt.Num(x.CumulativeReading)} {x.Meter.Unit})? ระบบจะคำนวณปริมาณการใช้ของรายการถัดไปใหม่")">
+                            <i class="bi bi-trash3"></i>
+                        </button>
+                    </td>
+                </tr>
+            }
+            @if (r.Items.Count == 0)
+            {
+                <tr><td colspan="8" class="empty"><i class="bi bi-inbox"></i>ไม่พบรายการค่าอ่านตามเงื่อนไข</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    @if (r.TotalPages > 1)
+    {
+        var start = Math.Max(1, r.Page - 2);
+        var end = Math.Min(r.TotalPages, start + 4);
+        start = Math.Max(1, end - 4);
+        <div class="card-x-header border-top border-bottom-0">
+            <span class="hint">หน้า @r.Page จาก @r.TotalPages</span>
+            <nav aria-label="เปลี่ยนหน้า">
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item @(r.Page <= 1 ? "disabled" : "")">
+                        <a class="page-link" asp-action="Index" asp-all-route-data="Route(r.Page - 1)" aria-label="ก่อนหน้า"><i class="bi bi-chevron-left"></i></a>
+                    </li>
+                    @for (var p = start; p <= end; p++)
+                    {
+                        <li class="page-item @(p == r.Page ? "active" : "")"><a class="page-link" asp-action="Index" asp-all-route-data="Route(p)">@p</a></li>
+                    }
+                    <li class="page-item @(r.Page >= r.TotalPages ? "disabled" : "")">
+                        <a class="page-link" asp-action="Index" asp-all-route-data="Route(r.Page + 1)" aria-label="ถัดไป"><i class="bi bi-chevron-right"></i></a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    }
+</div>

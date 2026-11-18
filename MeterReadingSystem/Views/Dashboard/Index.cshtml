@@ -1,0 +1,153 @@
+@model DashboardData
+@{
+    ViewData["Title"] = "แดชบอร์ด";
+    ViewData["Subtitle"] = "ภาพรวมการใช้น้ำและไฟฟ้า 12 เดือนล่าสุด";
+}
+
+@functions {
+    IHtmlContent Trend(LatestUsage? u)
+    {
+        if (u?.ChangePercent is not decimal p) return new HtmlString("<span>ไม่มีข้อมูลเดือนก่อนหน้าให้เปรียบเทียบ</span>");
+        var up = p > 0;
+        var icon = up ? "bi-arrow-up-right" : p < 0 ? "bi-arrow-down-right" : "bi-dash";
+        var cls = up ? "trend-up" : p < 0 ? "trend-down" : "";
+        return new HtmlString($"<span class=\"{cls}\"><i class=\"bi {icon}\"></i> {Math.Abs(p):0.#}%</span> เทียบกับเดือนก่อนหน้า");
+    }
+}
+
+<div class="row g-3 mb-3">
+    <div class="col-6 col-xl-3">
+        <div class="card-x hoverable stat">
+            <div class="stat-icon blue"><i class="bi bi-hdd-stack"></i></div>
+            <div>
+                <div class="stat-label">มิเตอร์ทั้งหมด</div>
+                <div class="stat-value">@Model.TotalMeters.ToString("N0")</div>
+                <div class="stat-sub">ใช้งานอยู่ @Model.ActiveMeters.ToString("N0") เครื่อง</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card-x hoverable stat">
+            <div class="stat-icon water"><i class="bi bi-droplet-fill"></i></div>
+            <div>
+                <div class="stat-label">มิเตอร์น้ำ</div>
+                <div class="stat-value">@Model.WaterMeters.ToString("N0")</div>
+                <div class="stat-sub">หน่วยวัด m³</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card-x hoverable stat">
+            <div class="stat-icon elec"><i class="bi bi-lightning-charge-fill"></i></div>
+            <div>
+                <div class="stat-label">มิเตอร์ไฟฟ้า</div>
+                <div class="stat-value">@Model.ElectricMeters.ToString("N0")</div>
+                <div class="stat-sub">หน่วยวัด kWh</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card-x hoverable stat">
+            <div class="stat-icon slate"><i class="bi bi-journal-text"></i></div>
+            <div>
+                <div class="stat-label">รายการอ่านมิเตอร์</div>
+                <div class="stat-value">@Model.TotalReadings.ToString("N0")</div>
+                <div class="stat-sub"><a asp-controller="Readings" asp-action="Index">ดูประวัติทั้งหมด</a></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-6">
+        <div class="card-x hoverable stat">
+            <div class="stat-icon water"><i class="bi bi-moisture"></i></div>
+            <div class="flex-grow-1">
+                <div class="stat-label">ปริมาณการใช้น้ำล่าสุด @(Model.LatestWater is null ? "" : $"({Model.LatestWater.MonthLabel})")</div>
+                <div class="stat-value">@(Model.LatestWater is null ? "-" : Fmt.Num(Model.LatestWater.Total))<small>m³</small></div>
+                <div class="stat-sub">@Trend(Model.LatestWater)</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card-x hoverable stat">
+            <div class="stat-icon elec"><i class="bi bi-plug-fill"></i></div>
+            <div class="flex-grow-1">
+                <div class="stat-label">ปริมาณการใช้ไฟฟ้าล่าสุด @(Model.LatestElectric is null ? "" : $"({Model.LatestElectric.MonthLabel})")</div>
+                <div class="stat-value">@(Model.LatestElectric is null ? "-" : Fmt.Num(Model.LatestElectric.Total))<small>kWh</small></div>
+                <div class="stat-sub">@Trend(Model.LatestElectric)</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-lg-6">
+        <div class="card-x h-100">
+            <div class="card-x-header"><h2><i class="bi bi-droplet text-info me-1"></i> ปริมาณการใช้น้ำรายเดือน</h2><span class="hint">m³</span></div>
+            <div class="card-x-body"><div class="chart-box"><canvas id="waterChart" aria-label="กราฟปริมาณการใช้น้ำรายเดือน"></canvas></div></div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card-x h-100">
+            <div class="card-x-header"><h2><i class="bi bi-lightning-charge text-warning me-1"></i> ปริมาณการใช้ไฟฟ้ารายเดือน</h2><span class="hint">kWh</span></div>
+            <div class="card-x-body"><div class="chart-box"><canvas id="elecChart" aria-label="กราฟปริมาณการใช้ไฟฟ้ารายเดือน"></canvas></div></div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-xl-5">
+        <div class="card-x h-100">
+            <div class="card-x-header"><h2><i class="bi bi-graph-up me-1 text-primary"></i> เปรียบเทียบการใช้งาน</h2><span class="hint">แกนซ้าย m³ · แกนขวา kWh</span></div>
+            <div class="card-x-body"><div class="chart-box"><canvas id="compareChart" aria-label="กราฟเปรียบเทียบการใช้น้ำและไฟฟ้า"></canvas></div></div>
+        </div>
+    </div>
+    <div class="col-xl-7">
+        <div class="card-x h-100">
+            <div class="card-x-header">
+                <h2><i class="bi bi-clock-history me-1 text-primary"></i> รายการอ่านมิเตอร์ล่าสุด</h2>
+                <a class="btn btn-soft btn-sm" asp-controller="Readings" asp-action="Index">ดูทั้งหมด <i class="bi bi-arrow-right"></i></a>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-x">
+                    <thead>
+                    <tr><th>วันที่อ่าน</th><th>มิเตอร์</th><th>ประเภท</th><th class="num">ค่าอ่านสะสม</th><th class="num">ปริมาณการใช้</th></tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var r in Model.RecentReadings)
+                    {
+                        <tr>
+                            <td>@Fmt.Date(r.ReadingDate)</td>
+                            <td><span class="code">@r.Meter!.MeterCode</span><div class="small text-secondary">@r.Meter.Location</div></td>
+                            <td>@Ui.TypeBadge(r.Meter.MeterType)</td>
+                            <td class="num">@Fmt.Num(r.CumulativeReading)</td>
+                            <td class="num">
+                                @if (r.Consumption.HasValue) { <strong>@Fmt.Num(r.Consumption)</strong> <small class="text-secondary">@r.Meter.Unit</small> }
+                                else { <span class="badge-soft badge-first">ครั้งแรก</span> }
+                            </td>
+                        </tr>
+                    }
+                    @if (Model.RecentReadings.Count == 0)
+                    {
+                        <tr><td colspan="5" class="empty"><i class="bi bi-inbox"></i>ยังไม่มีรายการอ่านมิเตอร์ <a asp-controller="Readings" asp-action="Create">บันทึกค่าอ่านแรก</a></td></tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/lib/chartjs/chart.umd.min.js"></script>
+    <script src="~/js/charts.js" asp-append-version="true"></script>
+    <script>
+        const labels = @Json.Serialize(Model.MonthLabels);
+        const water = @Json.Serialize(Model.WaterSeries);
+        const elec = @Json.Serialize(Model.ElectricSeries);
+        MeterCharts.bar('waterChart', labels, water, 'น้ำ (m³)', MeterCharts.colors.water);
+        MeterCharts.bar('elecChart', labels, elec, 'ไฟฟ้า (kWh)', MeterCharts.colors.elec);
+        MeterCharts.compare('compareChart', labels, water, elec);
+    </script>
+}

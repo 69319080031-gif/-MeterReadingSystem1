@@ -1,0 +1,14 @@
+@{
+    var code = (int)(ViewBag.Code ?? 404);
+    ViewData["Title"] = code == 404 ? "ไม่พบหน้าที่ต้องการ" : $"ข้อผิดพลาด {code}";
+}
+<div class="card-x text-center p-5 mx-auto" style="max-width:560px">
+    <div class="stat-icon blue mx-auto" style="width:72px;height:72px;font-size:2rem"><i class="bi bi-signpost-split"></i></div>
+    <h2 class="display-6 fw-semibold mt-3 mb-1">@code</h2>
+    <p class="text-secondary">
+        @(code == 404 ? "ไม่พบหน้าหรือข้อมูลที่คุณต้องการ ข้อมูลอาจถูกลบไปแล้ว" :
+          code == 400 ? "คำขอไม่ถูกต้อง (เช่น ฟอร์มหมดอายุ) กรุณาโหลดหน้าใหม่แล้วลองอีกครั้ง" :
+          "ไม่สามารถดำเนินการตามคำขอได้")
+    </p>
+    <a class="btn btn-primary" asp-controller="Dashboard" asp-action="Index"><i class="bi bi-house"></i> กลับหน้าแดชบอร์ด</a>
+</div>

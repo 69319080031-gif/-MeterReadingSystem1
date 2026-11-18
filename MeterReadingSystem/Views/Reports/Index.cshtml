@@ -1,0 +1,206 @@
+@model ReportViewModel
+@{
+    var rep = Model.Report;
+    var f = rep.Filter;
+    ViewData["Title"] = "รายงาน";
+    ViewData["Subtitle"] = "สรุปการใช้น้ำและไฟฟ้า รายเดือน รายปี และแยกตามมิเตอร์";
+    var monthly = f.Period == "monthly";
+    var exportRoute = new Dictionary<string, string?>
+    {
+        ["type"] = f.Type?.ToString(),
+        ["period"] = f.Period,
+        ["year"] = monthly ? f.Year?.ToString() : null,
+        ["meterId"] = f.MeterId?.ToString()
+    }.Where(kv => !string.IsNullOrEmpty(kv.Value)).ToDictionary(kv => kv.Key, kv => kv.Value!);
+    var cols = 2 + (rep.ShowWater ? 1 : 0) + (rep.ShowElectric ? 1 : 0);
+}
+
+<div class="card-x mb-3 no-print">
+    <div class="card-x-body">
+        <form method="get" class="filter-bar" id="reportForm">
+            <div>
+                <label class="form-label d-block">รูปแบบรายงาน</label>
+                <div class="seg">
+                    <input type="radio" name="period" id="pMonthly" value="monthly" checked="@monthly" data-autosubmit />
+                    <label for="pMonthly">รายเดือน</label>
+                    <input type="radio" name="period" id="pYearly" value="yearly" checked="@(!monthly)" data-autosubmit />
+                    <label for="pYearly">รายปี</label>
+                </div>
+            </div>
+            <div>
+                <label class="form-label" for="type">ประเภทการใช้</label>
+                <select class="form-select" id="type" name="type" data-autosubmit>
+                    <option value="">น้ำและไฟฟ้า</option>
+                    <option value="Water" selected="@(f.Type == MeterType.Water)">รายงานการใช้น้ำ</option>
+                    <option value="Electricity" selected="@(f.Type == MeterType.Electricity)">รายงานการใช้ไฟฟ้า</option>
+                </select>
+            </div>
+            @if (monthly)
+            {
+                <div>
+                    <label class="form-label" for="year">ปี (ค.ศ.)</label>
+                    <select class="form-select" id="year" name="year" data-autosubmit>
+                        @foreach (var y in rep.AvailableYears)
+                        {
+                            <option value="@y" selected="@(f.Year == y)">@y (พ.ศ. @(y + 543))</option>
+                        }
+                    </select>
+                </div>
+            }
+            <div>
+                <label class="form-label" for="meterId">แยกตามมิเตอร์</label>
+                <select class="form-select" id="meterId" name="meterId" data-autosubmit>
+                    <option value="">ทุกมิเตอร์</option>
+                    @foreach (var m in Model.Meters.Where(m => f.Type is null || m.MeterType == f.Type))
+                    {
+                        <option value="@m.Id" selected="@(f.MeterId == m.Id)">@m.MeterCode — @m.Location</option>
+                    }
+                </select>
+            </div>
+            <div class="actions">
+                <button class="btn btn-primary flex-fill" type="submit"><i class="bi bi-arrow-repeat"></i> แสดงรายงาน</button>
+            </div>
+        </form>
+        <div class="d-flex flex-wrap gap-2 mt-3 pt-3 border-top">
+            <a class="btn btn-light" asp-action="ExportCsv" asp-all-route-data="exportRoute"><i class="bi bi-filetype-csv text-success"></i> ส่งออก CSV</a>
+            <a class="btn btn-light" asp-action="ExportExcel" asp-all-route-data="exportRoute"><i class="bi bi-file-earmark-excel text-success"></i> ส่งออก Excel</a>
+            <button class="btn btn-light" type="button" onclick="window.print()"><i class="bi bi-printer text-primary"></i> พิมพ์รายงาน</button>
+        </div>
+    </div>
+</div>
+
+<div class="print-only mb-3">
+    <h2 style="font-size:18px;margin:0">@rep.Title</h2>
+    <div style="color:#64748B">ระบบบันทึกค่าอ่านมิเตอร์น้ำและไฟฟ้า · พิมพ์เมื่อ @Fmt.DateTime(DateTime.Now)</div>
+</div>
+
+<h2 class="h5 mb-3 no-print"><i class="bi bi-file-earmark-text text-primary me-1"></i> @rep.Title</h2>
+
+<div class="row g-3 mb-3">
+    @if (rep.ShowWater)
+    {
+        <div class="col-6 col-xl-3">
+            <div class="card-x stat">
+                <div class="stat-icon water"><i class="bi bi-droplet-fill"></i></div>
+                <div><div class="stat-label">ใช้น้ำรวม</div><div class="stat-value">@Fmt.Num(rep.TotalWater)<small>m³</small></div></div>
+            </div>
+        </div>
+    }
+    @if (rep.ShowElectric)
+    {
+        <div class="col-6 col-xl-3">
+            <div class="card-x stat">
+                <div class="stat-icon elec"><i class="bi bi-lightning-charge-fill"></i></div>
+                <div><div class="stat-label">ใช้ไฟฟ้ารวม</div><div class="stat-value">@Fmt.Num(rep.TotalElectric)<small>kWh</small></div></div>
+            </div>
+        </div>
+    }
+    <div class="col-6 col-xl-3">
+        <div class="card-x stat">
+            <div class="stat-icon blue"><i class="bi bi-hdd-stack"></i></div>
+            <div><div class="stat-label">จำนวนมิเตอร์ในรายงาน</div><div class="stat-value">@rep.Meters.Count</div></div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card-x stat">
+            <div class="stat-icon slate"><i class="bi bi-journal-text"></i></div>
+            <div><div class="stat-label">จำนวนรายการอ่าน</div><div class="stat-value">@rep.TotalReadings.ToString("N0")</div></div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-xl-7">
+        <div class="card-x h-100">
+            <div class="card-x-header"><h3><i class="bi bi-bar-chart me-1 text-primary"></i> กราฟสรุป@(monthly ? "รายเดือน" : "รายปี")</h3></div>
+            <div class="card-x-body"><div class="chart-box" style="height:clamp(290px, 50vh, 560px)"><canvas id="reportChart" aria-label="กราฟสรุปรายงาน"></canvas></div></div>
+        </div>
+    </div>
+    <div class="col-xl-5">
+        <div class="card-x h-100">
+            <div class="card-x-header"><h3><i class="bi bi-table me-1 text-primary"></i> สรุปตามช่วงเวลา</h3></div>
+            <div class="table-responsive">
+                <table class="table table-x">
+                    <thead>
+                    <tr>
+                        <th>@(monthly ? "เดือน" : "ปี")</th>
+                        @if (rep.ShowWater) { <th class="num">น้ำ (m³)</th> }
+                        @if (rep.ShowElectric) { <th class="num">ไฟฟ้า (kWh)</th> }
+                        <th class="num">รายการ</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var p in rep.Periods)
+                    {
+                        <tr>
+                            <td>@p.Label</td>
+                            @if (rep.ShowWater) { <td class="num">@Fmt.Num(p.Water)</td> }
+                            @if (rep.ShowElectric) { <td class="num">@Fmt.Num(p.Electric)</td> }
+                            <td class="num">@p.ReadingCount</td>
+                        </tr>
+                    }
+                    @if (rep.Periods.Count == 0)
+                    {
+                        <tr><td colspan="@cols" class="empty"><i class="bi bi-inbox"></i>ไม่มีข้อมูล</td></tr>
+                    }
+                    </tbody>
+                    <tfoot>
+                    <tr>
+                        <td>รวม</td>
+                        @if (rep.ShowWater) { <td class="num">@Fmt.Num(rep.TotalWater)</td> }
+                        @if (rep.ShowElectric) { <td class="num">@Fmt.Num(rep.TotalElectric)</td> }
+                        <td class="num">@rep.TotalReadings</td>
+                    </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card-x">
+    <div class="card-x-header"><h3><i class="bi bi-hdd-stack me-1 text-primary"></i> รายงานแยกตามมิเตอร์</h3></div>
+    <div class="table-responsive">
+        <table class="table table-x">
+            <thead>
+            <tr>
+                <th>รหัสมิเตอร์</th><th>ประเภท</th><th>สถานที่ติดตั้ง</th>
+                <th class="num">รายการอ่าน</th><th class="num">ปริมาณการใช้รวม</th><th class="num">เฉลี่ย/ครั้ง</th>
+                <th class="num">สูงสุด/ครั้ง</th><th class="num">ค่าอ่านล่าสุด</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var m in rep.Meters)
+            {
+                <tr>
+                    <td><a class="code text-decoration-none" asp-controller="Readings" asp-action="Index" asp-route-meterId="@m.Meter.Id">@m.Meter.MeterCode</a></td>
+                    <td>@Ui.TypeBadge(m.Meter.MeterType)</td>
+                    <td>@m.Meter.Location</td>
+                    <td class="num">@m.ReadingCount</td>
+                    <td class="num"><strong>@Fmt.Num(m.Total)</strong> <small class="text-secondary">@m.Meter.Unit</small></td>
+                    <td class="num">@Fmt.Num(m.Average)</td>
+                    <td class="num">@Fmt.Num(m.Max)</td>
+                    <td class="num">@Fmt.Num(m.Latest?.CumulativeReading)<div class="small text-secondary">@(m.Latest is null ? "" : Fmt.Date(m.Latest.ReadingDate))</div></td>
+                </tr>
+            }
+            @if (rep.Meters.Count == 0)
+            {
+                <tr><td colspan="8" class="empty"><i class="bi bi-inbox"></i>ไม่มีข้อมูลการอ่านมิเตอร์ในช่วงที่เลือก</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/lib/chartjs/chart.umd.min.js"></script>
+    <script src="~/js/charts.js" asp-append-version="true"></script>
+    <script>
+        MeterCharts.grouped('reportChart',
+            @Json.Serialize(rep.Periods.Select(p => p.Label)),
+            @Json.Serialize(rep.ShowWater ? rep.Periods.Select(p => p.Water) : null),
+            @Json.Serialize(rep.ShowElectric ? rep.Periods.Select(p => p.Electric) : null));
+        // Charts resize for print
+        window.addEventListener('beforeprint', () => Object.values(Chart.instances).forEach(c => c.resize()));
+    </script>
+}

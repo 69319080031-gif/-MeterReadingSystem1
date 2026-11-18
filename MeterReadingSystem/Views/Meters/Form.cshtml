@@ -1,0 +1,82 @@
+@model MeterFormViewModel
+@{
+    var isEdit = Model.Id.HasValue;
+    ViewData["Title"] = isEdit ? "แก้ไขมิเตอร์" : "เพิ่มมิเตอร์";
+    ViewData["Subtitle"] = isEdit ? $"แก้ไขข้อมูลมิเตอร์ {Model.MeterCode}" : "ลงทะเบียนมิเตอร์น้ำหรือไฟฟ้าใหม่";
+}
+
+<div class="row justify-content-center">
+    <div class="col-xl-8">
+        <form method="post" class="card-x" novalidate>
+            <div class="card-x-header">
+                <h2><i class="bi bi-hdd-stack me-1 text-primary"></i> ข้อมูลมิเตอร์</h2>
+                <span class="hint"><span class="text-danger">*</span> จำเป็นต้องกรอก</span>
+            </div>
+            <div class="card-x-body">
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label asp-for="MeterCode" class="form-label">รหัสมิเตอร์ <span class="req">*</span></label>
+                        <input asp-for="MeterCode" class="form-control" placeholder="เช่น W-004 หรือ E-010" autocomplete="off" />
+                        <span asp-validation-for="MeterCode"></span>
+                    </div>
+                    <div class="col-md-6">
+                        <label asp-for="MeterType" class="form-label">ประเภทมิเตอร์ <span class="req">*</span></label>
+                        @if (Model.HasReadings)
+                        {
+                            <input type="hidden" asp-for="MeterType" />
+                            <select class="form-select" disabled>
+                                <option>@MeterLabels.TypeName(Model.MeterType!.Value) (@MeterLabels.UnitOf(Model.MeterType.Value))</option>
+                            </select>
+                            <div class="form-text"><i class="bi bi-lock"></i> เปลี่ยนประเภทไม่ได้ เพราะมีการบันทึกค่าอ่านแล้ว</div>
+                        }
+                        else
+                        {
+                            <select asp-for="MeterType" class="form-select">
+                                <option value="">-- เลือกประเภท --</option>
+                                <option value="Water">มิเตอร์น้ำ (m³)</option>
+                                <option value="Electricity">มิเตอร์ไฟฟ้า (kWh)</option>
+                            </select>
+                            <div class="form-text">หน่วยวัดจะกำหนดอัตโนมัติตามประเภท</div>
+                        }
+                        <span asp-validation-for="MeterType"></span>
+                    </div>
+                    <div class="col-md-12">
+                        <label asp-for="Location" class="form-label">สถานที่ติดตั้ง <span class="req">*</span></label>
+                        <input asp-for="Location" class="form-control" placeholder="เช่น อาคารเรียน B ชั้น 2" />
+                        <span asp-validation-for="Location"></span>
+                    </div>
+                    <div class="col-md-6">
+                        <label asp-for="InstallationDate" class="form-label">วันที่ติดตั้ง <span class="req">*</span></label>
+                        <input asp-for="InstallationDate" type="date" class="form-control" max="@Fmt.Iso(DateTime.Today)" />
+                        <span asp-validation-for="InstallationDate"></span>
+                    </div>
+                    <div class="col-md-6">
+                        <label asp-for="Status" class="form-label">สถานะการใช้งาน</label>
+                        <select asp-for="Status" class="form-select">
+                            @foreach (var s in Enum.GetValues<MeterStatus>())
+                            {
+                                <option value="@s">@MeterLabels.StatusName(s)</option>
+                            }
+                        </select>
+                        <div class="form-text">มิเตอร์ที่ "ยกเลิกใช้งาน" จะไม่สามารถบันทึกค่าอ่านใหม่ได้</div>
+                    </div>
+                    <div class="col-12">
+                        <label asp-for="Notes" class="form-label">หมายเหตุ</label>
+                        <textarea asp-for="Notes" class="form-control" rows="3" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"></textarea>
+                        <span asp-validation-for="Notes"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="card-x-header border-top border-bottom-0 justify-content-end">
+                <a class="btn btn-light px-4" asp-action="Index">ยกเลิก</a>
+                <button class="btn btn-primary px-4" type="submit"><i class="bi bi-check-lg"></i> บันทึก</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
